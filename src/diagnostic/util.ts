@@ -126,14 +126,14 @@ export function getLocationListItem(bufnr: number, diagnostic: Diagnostic, lines
 }
 
 /**
- * Sort by severity and position
+ * Sort by position and severity
  */
 export function sortDiagnostics(a: Diagnostic, b: Diagnostic): number {
+  let d = comparePosition(a.range.start, b.range.start)
+  if (d != 0) return d
   if ((a.severity || 1) != (b.severity || 1)) {
     return (a.severity || 1) - (b.severity || 1)
   }
-  let d = comparePosition(a.range.start, b.range.start)
-  if (d != 0) return d
   return a.source > b.source ? 1 : -1
 }
 

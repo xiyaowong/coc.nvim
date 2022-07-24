@@ -6,7 +6,7 @@ import events from '../events'
 import { SyncItem } from '../model/bufferSync'
 import Document from '../model/document'
 import { DidChangeTextDocumentParams, HighlightItem, LocationListItem } from '../types'
-import { lineInRange, positionInRange } from '../util/position'
+import { comparePosition, lineInRange, positionInRange } from '../util/position'
 import workspace from '../workspace'
 import { adjustDiagnostics, DiagnosticConfig, getHighlightGroup, getLocationListItem, getNameFromSeverity, getSeverityType, sortDiagnostics } from './util'
 const logger = require('../util/logger')('diagnostic-buffer')
@@ -311,13 +311,15 @@ export class DiagnosticBuffer implements SyncItem {
         return start.line <= lnum - 1 && end.line >= lnum - 1
       })
     }
+    diagnostics = diagnostics.filter(d => {
+      return !(virtualTextLevel && d.severity && d.severity > virtualTextLevel)
+    })
     diagnostics.sort(sortDiagnostics)
     buffer.clearNamespace(virtualTextSrcId)
+    if (!diagnostics.length) return
+    if (this.config.virtualText) return this.setVirtualLines(diagnostics)
     for (let i = diagnostics.length - 1; i >= 0; i--) {
       let diagnostic = diagnostics[i]
-      if (virtualTextLevel && diagnostic.severity && diagnostic.severity > virtualTextLevel) {
-        continue
-      }
       let { line } = diagnostic.range.start
       let highlight = getNameFromSeverity(diagnostic.severity) + 'VirtualText'
       let msg = diagnostic.message.split(/\n/)
@@ -338,6 +340,30 @@ export class DiagnosticBuffer implements SyncItem {
       } else {
         void buffer.setVirtualText(virtualTextSrcId, line, [[virtualTextPrefix + msg, highlight]], {})
       }
+    }
+  }
+
+  private setVirtualLines(diagnostics: Diagnostic[]) {
+    const { virtualTextSrcId } = this.config
+    const { buffer, doc } = this
+
+    const lineList: {[key: number]: Diagnostic[]} = {}
+    diagnostics.forEach(diagnostic => {
+      const line = diagnostic.range.start.line
+      const list = lineList[line] ?? []
+      list.push(diagnostic)
+      lineList[line] = list
+    })
+
+    for (const line in lineList) {
+      diagnostics = lineList[line]
+      const lnum = Number(line)
+      const endIdx = diagnostics.length - 1
+      const virt_lines = []
+      diagnostics.forEach((diagnostic, idx) => {
+
+      })
+      buffer.setExtMark(virtualTextSrcId, lnum, 0, { virt_lines })
     }
   }
 
